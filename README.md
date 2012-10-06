@@ -1,4 +1,4 @@
 jssip-demos
 ===========
 
-Repository of  code using JsSIP
+Repository of example websites using [JsSIP](http://www.jssip.net) library.
