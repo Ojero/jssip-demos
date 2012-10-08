@@ -238,30 +238,30 @@ $(document).ready(function(){
     MyPhone.on('disconnect', ws_disconnected);
 
     // Call/Message reception callbacks
-    MyPhone.on('call', function(display_name, uri, call) {
-      GUI.phoneCallReceived(display_name, uri, call)
+    MyPhone.on('new_session', function(e) {
+      GUI.new_session(e)
       }
     );
 
-    MyPhone.on('message', function(display_name, uri, text) {
-      GUI.phoneChatReceived(display_name, uri, text)
+    MyPhone.on('new_message', function(e) {
+      GUI.new_message(e)
       }
     );
 
     // Registration/Deregistration callbacks
-    MyPhone.on('register', function(){
+    MyPhone.on('ua_registered', function(e){
       console.info('Registered');
       GUI.setStatus("registered");
       }
     );
 
-    MyPhone.on('deregister', function(){
+    MyPhone.on('ua_deregistered', function(e){
       console.info('Deregistered');
       GUI.setStatus("connected");
       }
     );
 
-    MyPhone.on('registrationFailure', function() {
+    MyPhone.on('ua_registration_failed', function(e) {
       console.info('Registration failure');
       GUI.setStatus("connected");
       }
@@ -271,7 +271,7 @@ $(document).ready(function(){
     MyPhone.start();
   }
 
-  function ws_connected() {
+  function ws_connected(e) {
     document.title = PageTitle;
     GUI.setStatus("connected");
     // Habilitar el phone.

@@ -22,25 +22,8 @@ window.GUI = {
 
     phone_dialed_number_screen.val("");
 
-    var session = GUI.getSession(uri);
-
-    // If this is a new session create it with call status "trying".
-    if (!session) {
-      session = GUI.createSession(user, uri);
-      GUI.setCallSessionStatus(session, "trying");
-      session.call = GUI.jssipCall(uri, session);
-      session.call.send();
-    }
-    // If the session already exists but has no call, start it and set to "trying".
-    else if ($(session).find(".call").hasClass("inactive")) {
-      GUI.setCallSessionStatus(session, "trying");
-      session.call = GUI.jssipCall(uri, session);
-    }
-    // If the session exists with active call do nothing.
-    else {
-    }
-
-    $(session).find(".chat input").focus();
+    call = GUI.jssipCall(uri);
+    call.send()
   },
 
 
@@ -82,51 +65,94 @@ window.GUI = {
 
 
   /*
-   * Esta función debe ser llamada por jssip al recibir un initial INVITE,
-   * y debe pasar como parámetros el display-name (sin "" a ser posible)
-   * y el From URI (sip:user@domain).
-   * Si el display-name es null, entonces jssip debe pasar el From URI username.
+   * JsSIP.UA new_session event listener
    */
-  phoneCallReceived : function(display_name, uri, call) {
-    var session = GUI.getSession(uri);
+  new_session : function(e) {
+    var session, call, message, display_name, uri;
+    message = e.data.request;
+    call = e.sender;
+    uri = call.remote_identity;
+    session = GUI.getSession(uri);
 
-    // If this is a new session create it with call status "incoming".
-    if (!session) {
-      session = GUI.createSession(display_name, uri);
-      GUI.setCallSessionStatus(session, "incoming");
-    }
-    // If the session already exists but has no call, start it and set to "incoming".
-    else if ($(session).find(".call").hasClass("inactive")) {
-      GUI.setCallSessionStatus(session, "incoming");
-    }
-    // If the session exists with active callreject it.
-    else {
-      call.terminate();
-      return false;
+    if (call.direction === 'remote') {
+      display_name = message.s('from').user;
+
+      // If this is a new session create it with call status "incoming".
+      if (!session) {
+        session = GUI.createSession(display_name, uri);
+        GUI.setCallSessionStatus(session, "incoming");
+      }
+      // If the session already exists but has no call, start it and set to "incoming".
+      else if ($(session).find(".call").hasClass("inactive")) {
+        GUI.setCallSessionStatus(session, "incoming");
+      }
+      // If the session exists with active callreject it.
+      else {
+        call.terminate();
+        return false;
+      }
+    } else {
+      display_name = message.ruri;
+
+      // If this is a new session create it with call status "trying".
+      if (!session) {
+        session = GUI.createSession(display_name, uri);
+        GUI.setCallSessionStatus(session, "trying");
+      }
+      // If the session already exists but has no call, start it and set to "trying".
+      else if ($(session).find(".call").hasClass("inactive")) {
+        GUI.setCallSessionStatus(session, "trying");
+      }
+      // If the session exists do nothing.
+      else {
+        return false;
+      }
     }
 
     session.call = call;
-    session.call.on('cancel',function(reason) {
-      document.title = PageTitle;
-      if (reason && reason.match("SIP;cause=200", "i")) {
-        GUI.setCallSessionStatus(session, "answered_elsewhere");
-        GUI.removeSession(session, 1500);
-      }
-      else {
-        GUI.setCallSessionStatus(session, "terminated", "cancelled by peer");
-        GUI.removeSession(session, 1000);
+    session.call.on('session_failed',function(e) {
+      var cause, response, code;
+
+      cause = e.data.cause.toLowerCase();
+
+      if (e.data.originator === 'remote') {
+        cause = e.data.cause;
+        document.title = PageTitle;
+        if (cause && cause.match("SIP;cause=200", "i")) {
+          GUI.setCallSessionStatus(session, "answered_elsewhere");
+          GUI.removeSession(session, 1500);
+        }
+        else {
+          GUI.setCallSessionStatus(session, "terminated", code);
+          GUI.removeSession(session, 1000);
+        }
+      } else {
+        response = e.data.response;
+        GUI.setCallSessionStatus(session, 'terminated', code);
+        soundPlayer.setAttribute("src", "sounds/outgoing-call-rejected.wav");
+        soundPlayer.play();
+        GUI.removeSession(session, 500);
       }
     });
-    session.call.on('terminate', function(cause) {
-      switch (cause) {
+    session.call.on('session_ended', function(e) {
+      var code = e.data.code;
+      switch (code) {
         default:
           (function(){
             document.title = PageTitle;
-            GUI.setCallSessionStatus(session, "terminated", cause.toLowerCase());
+            GUI.setCallSessionStatus(session, "terminated", code.toLowerCase());
             GUI.removeSession(session, 1500);
           })();
           break;
       }
+    });
+
+    call.on('session_started',function(e){
+        GUI.setCallSessionStatus(session, 'answered');
+    });
+
+    call.on('session_progress',function(e){
+      GUI.setCallSessionStatus(session, 'in-progress');
     });
 
     $(session).find(".chat input").focus();
@@ -137,13 +163,12 @@ window.GUI = {
 
 
   /*
-   * Esta función debe ser llamada por jssip al recibir un MESSAGE
-   * de tipo text/plain,
-   * y debe pasar como parámetros el display-name (sin "" a ser posible),
-   * el From URI (sip:user@domain) y el texto del MESSAGE.
-   * Si el display-name es null, entonces jssip debe pasar el From URI username.
+   * JsSIP.UA new_message event listener
    */
-  phoneChatReceived : function(display_name, uri, text) {
+  new_message : function(e) {
+    var display_name = e.data.request.s('from').user;
+    var uri = e.data.request.s('from').uri;
+    var text = e.data.content;
     var session = GUI.getSession(uri);
 
     // If this is a new session create it with call status "inactive", and add the message.
@@ -153,7 +178,7 @@ window.GUI = {
     }
 
     GUI.addChatMessage(session, "peer", text);
-    //$(session).find(".chat input").focus();
+    $(session).find(".chat input").focus();
   },
 
 
@@ -323,16 +348,20 @@ window.GUI = {
     button_hold.unbind("click");
     button_resume.unbind("click");
 
+    button_hangup.click(function() {
+      GUI.setCallSessionStatus(session, "terminated", "terminated");
+      session.call.terminate();
+      GUI.removeSession(session, 500);
+    });
+
     switch(status) {
 
       case "inactive":
-
         call.removeClass();
         call.addClass("call inactive");
         status_text.text("");
 
         button_dial.click(function() {
-          GUI.setCallSessionStatus(session, "trying");
           session.call = GUI.jssipCall(uri, session);
           session.call.send();
         });
@@ -346,12 +375,6 @@ window.GUI = {
         status_text.text(description || "trying...");
         soundPlayer.setAttribute("src", "sounds/outgoing-call2.ogg");
         soundPlayer.play();
-
-        button_hangup.click(function() {
-          GUI.setCallSessionStatus(session, "terminated", "cancelled");
-          session.call.terminate();
-          GUI.removeSession(session, 500);
-        });
 
         // unhide HTML Video Elements
         $('#remoteView').attr('hidden', false);
@@ -369,12 +392,6 @@ window.GUI = {
         call.addClass("call in-progress");
         status_text.text(description || "in progress...");
 
-        button_hangup.click(function() {
-          GUI.setCallSessionStatus(session, "terminated", "cancelled");
-          session.call.terminate();
-          GUI.removeSession(session, 500);
-        });
-
         break;
 
       case "answered":
@@ -382,17 +399,6 @@ window.GUI = {
         call.removeClass();
         call.addClass("call answered");
         status_text.text(description || "answered");
-
-        button_hangup.click(function() {
-          GUI.setCallSessionStatus(session, "terminated", "terminated");
-          session.call.terminate();
-          GUI.removeSession(session, 500);
-        });
-
-        button_hold.click(function() {
-          GUI.setCallSessionStatus(session, "on-hold");
-          session.call.hold();
-        });
 
         break;
 
@@ -405,34 +411,13 @@ window.GUI = {
         break;
 
       case "answered_elsewhere":
-
         call.removeClass();
         call.addClass("call answered-elsewhere");
         status_text.text("answered elsewhere");
 
         break;
 
-      case "on-hold":
-
-        call.removeClass();
-        call.addClass("call on-hold");
-        status_text.text("on hold");
-
-        button_hangup.click(function() {
-          GUI.setCallSessionStatus(session, "terminated", "terminated");
-          session.call.terminate();
-          GUI.removeSession(session, 500);
-        });
-
-        button_resume.click(function() {
-          GUI.setCallSessionStatus(session, "answered");
-          session.call.hold();
-        });
-
-        break;
-
       case "incoming":
-
         document.title = "*** incoming call ***";
         call.removeClass();
         call.addClass("call incoming");
@@ -442,17 +427,9 @@ window.GUI = {
 
         button_dial.click(function() {
           document.title = PageTitle;
-          GUI.setCallSessionStatus(session, "answered");
           var selfView = document.getElementById('selfView');
           var remoteView = document.getElementById('remoteView');
           session.call.answer(selfView, remoteView);
-        });
-
-        button_hangup.click(function() {
-          document.title = PageTitle;
-          GUI.setCallSessionStatus(session, "terminated", "rejected");
-          session.call.terminate();
-          GUI.removeSession(session);
         });
 
         // unhide HTML Video Elements
@@ -557,50 +534,27 @@ window.GUI = {
   },
 
 
-  jssipCall : function(uri, session) {
-    var selfView = document.getElementById('selfView');
-    var remoteView = document.getElementById('remoteView');
-    var call =  MyPhone.call(uri, selfView, remoteView, {audio: true, video: $('#video').is(':checked')});
-    call.on('ring',function(){
-      GUI.setCallSessionStatus(session, 'in-progress');
-    });
-    call.on('failure',function(status, reason){
-      GUI.setCallSessionStatus(session, 'terminated', "" + status + " " + reason);
-      soundPlayer.setAttribute("src", "sounds/outgoing-call-rejected.wav");
-      soundPlayer.play();
-      GUI.removeSession(session, 500);
-    });
-    call.on('answer',function(){
-      GUI.setCallSessionStatus(session, 'answered');
-    });
-    call.on('terminate', function(cause) {
-      switch (cause) {
-        default:
-          (function(){
-            document.title = PageTitle;
-            GUI.setCallSessionStatus(session, "terminated", cause.toLowerCase());
-            GUI.removeSession(session, 1500);
-          })();
-          break;
-      }
-    });
-    call.on('error',function(error){
-      GUI.setCallSessionStatus(session, 'terminated', error);
-      GUI.removeSession(session, 1500);
-    });
+  jssipCall : function(uri) {
+      var selfView, remoteView, call;
 
-    return call;
+      selfView = document.getElementById('selfView');
+      remoteView = document.getElementById('remoteView');
+      call =  MyPhone.call(uri, selfView, remoteView, {audio: true, video: true});
+
+      return call;
   },
 
 
   jssipMessage : function(session, uri, text) {
     try {
       var messager = MyPhone.message(uri,text);
-      messager.on('success', function(response){ });
-      messager.on('failure', function(response){
+      messager.on('success', function(e){ });
+      messager.on('failure', function(e){
+        var response = e.data.response;
         GUI.addChatMessage(session, "error", response.status_code.toString() + " " + response.reason_phrase);
       });
-      messager.on('error', function(error){
+      messager.on('error', function(e){
+        error = e.data.code;
         if (error == JsSIP.c.REQUEST_TIMEOUT) {
           GUI.addChatMessage(session, "error", "request timeout");
         }
