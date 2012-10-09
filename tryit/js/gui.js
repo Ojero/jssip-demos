@@ -111,7 +111,7 @@ window.GUI = {
 
     session.call = call;
     session.call.on('session_failed',function(e) {
-      var cause, response, code;
+      var cause, response;
 
       cause = e.data.cause.toLowerCase();
 
@@ -123,24 +123,24 @@ window.GUI = {
           GUI.removeSession(session, 1500);
         }
         else {
-          GUI.setCallSessionStatus(session, "terminated", code);
+          GUI.setCallSessionStatus(session, "terminated", cause);
           GUI.removeSession(session, 1000);
         }
       } else {
         response = e.data.response;
-        GUI.setCallSessionStatus(session, 'terminated', code);
+        GUI.setCallSessionStatus(session, 'terminated', cause);
         soundPlayer.setAttribute("src", "sounds/outgoing-call-rejected.wav");
         soundPlayer.play();
         GUI.removeSession(session, 500);
       }
     });
     session.call.on('session_ended', function(e) {
-      var code = e.data.code;
-      switch (code) {
+      var cause = e.data.cause;
+      switch (cause) {
         default:
           (function(){
             document.title = PageTitle;
-            GUI.setCallSessionStatus(session, "terminated", code.toLowerCase());
+            GUI.setCallSessionStatus(session, "terminated", cause.toLowerCase());
             GUI.removeSession(session, 1500);
           })();
           break;
