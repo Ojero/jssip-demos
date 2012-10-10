@@ -535,11 +535,18 @@ window.GUI = {
 
 
   jssipCall : function(uri) {
-      var selfView, remoteView, call;
+      var call, options;
 
-      selfView = document.getElementById('selfView');
-      remoteView = document.getElementById('remoteView');
-      call =  MyPhone.call(uri, selfView, remoteView, {audio: true, video: true});
+      // Call Options
+      options = {
+        views: {
+          selfView: document.getElementById('selfView'),
+          remoteView: document.getElementById('remoteView')
+        },
+        mediaType: {audio: true, video: $('#video').is(':checked')}
+      };
+
+      call =  MyPhone.call(uri, options);
 
       return call;
   },
