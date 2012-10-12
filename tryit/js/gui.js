@@ -23,7 +23,6 @@ window.GUI = {
     phone_dialed_number_screen.val("");
 
     call = GUI.jssipCall(uri);
-    call.send()
   },
 
 
@@ -70,11 +69,11 @@ window.GUI = {
   new_session : function(e) {
     var session, call, message, display_name, uri;
     message = e.data.request;
-    call = e.sender;
+    call = e.data.session;
     uri = call.remote_identity;
     session = GUI.getSession(uri);
 
-    if (call.direction === 'remote') {
+    if (call.direction === 'incoming') {
       display_name = message.s('from').user;
 
       // If this is a new session create it with call status "incoming".
@@ -110,10 +109,10 @@ window.GUI = {
     }
 
     session.call = call;
-    session.call.on('session_failed',function(e) {
+    session.call.on('failed',function(e) {
       var cause, response;
 
-      cause = e.data.cause.toLowerCase();
+      cause = e.data.cause;
 
       if (e.data.originator === 'remote') {
         cause = e.data.cause;
@@ -134,24 +133,24 @@ window.GUI = {
         GUI.removeSession(session, 500);
       }
     });
-    session.call.on('session_ended', function(e) {
+    session.call.on('ended', function(e) {
       var cause = e.data.cause;
       switch (cause) {
         default:
           (function(){
             document.title = PageTitle;
-            GUI.setCallSessionStatus(session, "terminated", cause.toLowerCase());
+            GUI.setCallSessionStatus(session, "terminated", cause);
             GUI.removeSession(session, 1500);
           })();
           break;
       }
     });
 
-    call.on('session_started',function(e){
+    call.on('started',function(e){
         GUI.setCallSessionStatus(session, 'answered');
     });
 
-    call.on('session_progress',function(e){
+    call.on('progress',function(e){
       GUI.setCallSessionStatus(session, 'in-progress');
     });
 
@@ -166,19 +165,32 @@ window.GUI = {
    * JsSIP.UA new_message event listener
    */
   new_message : function(e) {
-    var display_name = e.data.request.s('from').user;
-    var uri = e.data.request.s('from').uri;
-    var text = e.data.content;
-    var session = GUI.getSession(uri);
+    var display_name, uri, text, session;
+    message = e.data.message;
+    uri = message.remote_identity;
+    session = GUI.getSession(uri);
 
-    // If this is a new session create it with call status "inactive", and add the message.
-    if (!session) {
-      session = GUI.createSession(display_name, uri);
-      GUI.setCallSessionStatus(session, "inactive");
+    if (e.data.message.direction === 'incoming') {
+      display_name = e.data.request.s('from').user;
+      uri = e.data.request.s('from').uri;
+      text = e.data.content;
+
+      // If this is a new session create it with call status "inactive", and add the message.
+      if (!session) {
+        session = GUI.createSession(display_name, uri);
+        GUI.setCallSessionStatus(session, "inactive");
+      }
+
+      GUI.addChatMessage(session, "peer", text);
+      $(session).find(".chat input").focus();
+    } else {
+      display_name = e.data.request.ruri;
+      message.on('succeeded', function(e){ });
+      message.on('failed', function(e){
+        var response = e.data.response;
+        GUI.addChatMessage(session, "error", response.status_code.toString() + " " + response.reason_phrase);
+      });
     }
-
-    GUI.addChatMessage(session, "peer", text);
-    $(session).find(".chat input").focus();
   },
 
 
@@ -362,8 +374,7 @@ window.GUI = {
         status_text.text("");
 
         button_dial.click(function() {
-          session.call = GUI.jssipCall(uri, session);
-          session.call.send();
+          session.call = GUI.jssipCall(uri);
         });
 
         break;
@@ -534,50 +545,23 @@ window.GUI = {
   },
 
 
-  jssipCall : function(uri) {
-      var call, options;
+  jssipCall : function(target) {
+      var selfView, remoteView, mediaType;
 
-      // Call Options
-      options = {
-        views: {
-          selfView: document.getElementById('selfView'),
-          remoteView: document.getElementById('remoteView')
-        },
-        mediaType: {audio: true, video: $('#video').is(':checked')}
-      };
+      selfView = document.getElementById('selfView'),
+      remoteView = document.getElementById('remoteView')
+      mediaType = {audio: true, video: $('#video').is(':checked')};
 
-      call =  MyPhone.call(uri, options);
-
-      return call;
+      call =  MyPhone.call(target, selfView, remoteView, mediaType);
   },
 
 
   jssipMessage : function(session, uri, text) {
     try {
       var messager = MyPhone.message(uri,text);
-      messager.on('success', function(e){ });
-      messager.on('failure', function(e){
-        var response = e.data.response;
-        GUI.addChatMessage(session, "error", response.status_code.toString() + " " + response.reason_phrase);
-      });
-      messager.on('error', function(e){
-        error = e.data.code;
-        if (error == JsSIP.c.REQUEST_TIMEOUT) {
-          GUI.addChatMessage(session, "error", "request timeout");
-        }
-        else if (error === JsSIP.c.TRANSPORT_ERROR) {
-          GUI.addChatMessage(session, "error", "transport error");
-        }
-        else if (error === JsSIP.c.USER_CLOSED) {
-            GUI.addChatMessage(session, "error", "user closed");
-        }
-        else if (error === JsSIP.c.INVALID_TARGET) {
-            GUI.addChatMessage(session, "error", "Invalid target");
-        }
-      });
-      messager.send();
     } catch(e){
       console.log(e);
+      return;
     }
   },
 

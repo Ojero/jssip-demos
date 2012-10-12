@@ -3,11 +3,7 @@ $(document).ready(function(){
   // Default settings.
   var default_sip_uri = "jmillan@jssip.net";
   var default_sip_password = '';
-  var outbound_proxy_set = {
-    host: "tryit.jssip.net:10080",
-    ws_path:'ws',
-    ws_query: 'wwdf'
-  };
+  var outbound_proxy_set = 'ws://tryit.jssip.net:10080';
 
 
   // Global variables.
@@ -95,12 +91,7 @@ $(document).ready(function(){
         sip_password = login_sip_password.val();
       if (login_ws_uri.val() != "" && ! login_ws_uri.hasClass("unset")) {
         ws_uri = login_ws_uri.val();
-        if (!check_ws_uri(ws_uri)) {
-          alert("Invalid WS URI field");
-          return;
-        } else {
-          outbound_proxy_set = check_ws_uri(ws_uri);
-        }
+        outbound_proxy_set = ws_uri;
       }
 
       if (sip_uri == null) {
@@ -221,47 +212,49 @@ $(document).ready(function(){
       'password':  sip_password,
       'register_expires': 120,
       'secure_transport': false,
-      'via_host': random_host(),
       'stun_server': 'aliax.net',
-      'hack_use_via_tcp': true
+      'hack_ip_in_contact': true,
+      'hack_via_tcp': true
     };
 
-    try {
+    MyPhone = new JsSIP.UA(configuration);
+
+    /*try {
       MyPhone = new JsSIP.UA(configuration);
     } catch(e) {
       console.log(e);
       return;
-    }
+    }*/
 
     // Transport connection/disconnection callbacks
-    MyPhone.on('connect', ws_connected);
-    MyPhone.on('disconnect', ws_disconnected);
+    MyPhone.on('connected', ws_connected);
+    MyPhone.on('disconnected', ws_disconnected);
 
     // Call/Message reception callbacks
-    MyPhone.on('new_session', function(e) {
+    MyPhone.on('newSession', function(e) {
       GUI.new_session(e)
       }
     );
 
-    MyPhone.on('new_message', function(e) {
+    MyPhone.on('newMessage', function(e) {
       GUI.new_message(e)
       }
     );
 
     // Registration/Deregistration callbacks
-    MyPhone.on('ua_registered', function(e){
+    MyPhone.on('registered', function(e){
       console.info('Registered');
       GUI.setStatus("registered");
       }
     );
 
-    MyPhone.on('ua_deregistered', function(e){
+    MyPhone.on('deregistered', function(e){
       console.info('Deregistered');
       GUI.setStatus("connected");
       }
     );
 
-    MyPhone.on('ua_registration_failed', function(e) {
+    MyPhone.on('registration_failed', function(e) {
       console.info('Registration failure');
       GUI.setStatus("connected");
       }
@@ -288,48 +281,6 @@ $(document).ready(function(){
       GUI.removeSession(session, 500);
     });
   };
-
-  function random_host() {
-    function get_octet() {
-      return (Math.random() * 255 | 0) + 1;
-    }
-    return get_octet()+'.'+get_octet()+'.'+get_octet()+'.'+get_octet();
-  }
-
-  function check_ws_uri(ws_uri) {
-    var ws_uri_prefix, ws_uri_hostport, ws_uri_path, ws_uri_query, slash_idx, query_idx;
-
-    ws_uri_prefix = ws_uri.substr(0,5);
-
-    if (ws_uri_prefix !== 'ws://') {
-      return false
-    }
-
-    ws_uri = ws_uri.substr(5);
-    slash_idx = ws_uri.indexOf('/');
-
-    if (slash_idx === -1) {
-      ws_uri_hostport = ws_uri;
-    } else {
-      ws_uri_hostport = ws_uri.substr(0,slash_idx);
-      ws_uri = ws_uri.substr(slash_idx);
-      query_idx = ws_uri.indexOf('?');
-
-      if (query_idx === -1) {
-        ws_uri_path = ws_uri.substr(1);
-      } else {
-        ws_uri_path = ws_uri.substr(1, query_idx-1);
-        ws_uri_query = ws_uri.substr(query_idx+1);
-      }
-    }
-
-    return {
-      host: ws_uri_hostport,
-      ws_path: ws_uri_path,
-      ws_query: ws_uri_query
-    };
-  }
-
 
   // If data is already set (default values) then directly go.
   if (sip_uri && sip_password && ws_uri)
