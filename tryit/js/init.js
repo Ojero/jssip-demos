@@ -246,7 +246,7 @@ $(document).ready(function(){
       }
     );
 
-    MyPhone.on('deregistered', function(e){
+    MyPhone.on('unregistered', function(e){
       console.info('Deregistered');
       GUI.setStatus("connected");
       }
