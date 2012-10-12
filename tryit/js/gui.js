@@ -79,10 +79,12 @@ window.GUI = {
       // If this is a new session create it with call status "incoming".
       if (!session) {
         session = GUI.createSession(display_name, uri);
+        session.call = call;
         GUI.setCallSessionStatus(session, "incoming");
       }
       // If the session already exists but has no call, start it and set to "incoming".
       else if ($(session).find(".call").hasClass("inactive")) {
+        session.call = call;
         GUI.setCallSessionStatus(session, "incoming");
       }
       // If the session exists with active callreject it.
@@ -96,10 +98,12 @@ window.GUI = {
       // If this is a new session create it with call status "trying".
       if (!session) {
         session = GUI.createSession(display_name, uri);
+        session.call = call;
         GUI.setCallSessionStatus(session, "trying");
       }
       // If the session already exists but has no call, start it and set to "trying".
       else if ($(session).find(".call").hasClass("inactive")) {
+        session.call = call;
         GUI.setCallSessionStatus(session, "trying");
       }
       // If the session exists do nothing.
