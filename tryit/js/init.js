@@ -217,14 +217,12 @@ $(document).ready(function(){
       'hack_via_tcp': true
     };
 
-    MyPhone = new JsSIP.UA(configuration);
-
-    /*try {
+    try {
       MyPhone = new JsSIP.UA(configuration);
     } catch(e) {
       console.log(e);
       return;
-    }*/
+    }
 
     // Transport connection/disconnection callbacks
     MyPhone.on('connected', ws_connected);

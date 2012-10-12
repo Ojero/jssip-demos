@@ -151,7 +151,9 @@ window.GUI = {
     });
 
     call.on('progress',function(e){
-      GUI.setCallSessionStatus(session, 'in-progress');
+      if (e.originator === 'remote') {
+        GUI.setCallSessionStatus(session, 'in-progress');
+      }
     });
 
     $(session).find(".chat input").focus();
@@ -165,15 +167,15 @@ window.GUI = {
    * JsSIP.UA new_message event listener
    */
   new_message : function(e) {
-    var display_name, uri, text, session;
+    var display_name, uri, text, session, request;
     message = e.data.message;
     uri = message.remote_identity;
     session = GUI.getSession(uri);
 
-    if (e.data.message.direction === 'incoming') {
+    if (message.direction === 'incoming') {
       display_name = e.data.request.s('from').user;
       uri = e.data.request.s('from').uri;
-      text = e.data.content;
+      text = e.data.request.body;
 
       // If this is a new session create it with call status "inactive", and add the message.
       if (!session) {
@@ -552,7 +554,12 @@ window.GUI = {
       remoteView = document.getElementById('remoteView')
       mediaType = {audio: true, video: $('#video').is(':checked')};
 
-      call =  MyPhone.call(target, selfView, remoteView, mediaType);
+      try {
+        call =  MyPhone.call(target, selfView, remoteView, mediaType);
+      } catch(e){
+        console.log(e);
+        return;
+      }
   },
 
 
