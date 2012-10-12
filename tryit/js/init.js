@@ -252,7 +252,7 @@ $(document).ready(function(){
       }
     );
 
-    MyPhone.on('registration_failed', function(e) {
+    MyPhone.on('registrationFailed', function(e) {
       console.info('Registration failure');
       GUI.setStatus("connected");
       }
