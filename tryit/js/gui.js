@@ -1,23 +1,10 @@
 window.GUI = {
 
   phoneCallButtonPressed : function() {
-    var user, uri;
+    var uri;
 
-    if (!(destination = phone_dialed_number_screen.val()))
+    if (!(uri = phone_dialed_number_screen.val())) {
       return false;
-
-    uri = destination;
-    if (! uri) {
-      alert("ERROR: wrong destination (" + destination + ")");
-      return false;
-    }
-
-    uri = JsSIP.utils.normalizeUri(uri, MyPhone.configuration.domain);
-    if (uri) {
-      user = JsSIP.grammar_sip.parse(uri, 'SIP_URI').user;
-    } else {
-      console.log('Invalid target');
-      return;
     }
 
     phone_dialed_number_screen.val("");
@@ -27,14 +14,9 @@ window.GUI = {
 
 
   phoneChatButtonPressed : function() {
-    var user, uri;
+    var user, uri, session;
 
-    if (!(destination = phone_dialed_number_screen.val()))
-      return false;
-
-    uri = destination;
-    if (! uri) {
-      alert("ERROR: wrong destination (" + destination + ")");
+    if (!(uri = phone_dialed_number_screen.val())) {
       return false;
     }
 
@@ -42,13 +24,13 @@ window.GUI = {
     if (uri) {
       user = JsSIP.grammar_sip.parse(uri, 'SIP_URI').user;
     } else {
-      console.log('Invalid target');
+      alert('Invalid target');
       return;
     }
 
     phone_dialed_number_screen.val("");
 
-    var session = GUI.getSession(uri);
+    session = GUI.getSession(uri);
 
     // If this is a new session create it without call.
     if (!session) {
@@ -56,8 +38,6 @@ window.GUI = {
       GUI.setCallSessionStatus(session, "inactive");
     }
     // If it exists, do nothing.
-    else {
-    }
 
     $(session).find(".chat input").focus();
   },
@@ -106,13 +86,13 @@ window.GUI = {
         session.call = call;
         GUI.setCallSessionStatus(session, "trying");
       }
-      // If the session exists do nothing.
+      // If the session exists just associate the call to it.
       else {
-        return false;
+        session.call = call;
+        GUI.setCallSessionStatus(session, "trying");
       }
     }
 
-    session.call = call;
     session.call.on('failed',function(e) {
       var cause, response;
 
@@ -161,9 +141,6 @@ window.GUI = {
     });
 
     $(session).find(".chat input").focus();
-
-    // Return true so jssip knows that the call is ringing in the web.
-    return true;
   },
 
 
@@ -178,7 +155,6 @@ window.GUI = {
 
     if (message.direction === 'incoming') {
       display_name = e.data.request.s('from').user;
-      uri = e.data.request.s('from').uri;
       text = e.data.request.body;
 
       // If this is a new session create it with call status "inactive", and add the message.
@@ -317,7 +293,7 @@ window.GUI = {
         var text = chat_input.val();
         GUI.addChatMessage(session, "me", text);
         chat_input.val("");
-        GUI.jssipMessage(session, uri, text);
+        GUI.jssipMessage(uri, text);
       }
       // Ignore Enter when empty input.
       else if (e.which == 13 && $(this).val() == "") {
@@ -345,6 +321,7 @@ window.GUI = {
 
 
   setCallSessionStatus : function(session, status, description) {
+    var session = session;
     var uri = $(session).find(".peer > .uri").text();
     var call = $(session).find(".call");
     var status_text = $(session).find(".call-status");
@@ -373,7 +350,6 @@ window.GUI = {
     });
 
     switch(status) {
-
       case "inactive":
         call.removeClass();
         call.addClass("call inactive");
@@ -382,11 +358,9 @@ window.GUI = {
         button_dial.click(function() {
           session.call = GUI.jssipCall(uri);
         });
-
         break;
 
       case "trying":
-
         call.removeClass();
         call.addClass("call trying");
         status_text.text(description || "trying...");
@@ -399,43 +373,27 @@ window.GUI = {
 
         // Set background image
         $('#remoteView').attr('poster', "images/sip-on-the-web.png");
-
-
         break;
 
       case "in-progress":
-
         call.removeClass();
         call.addClass("call in-progress");
         status_text.text(description || "in progress...");
-
         break;
 
       case "answered":
-
         call.removeClass();
         call.addClass("call answered");
         status_text.text(description || "answered");
-
         break;
 
       case "terminated":
-
         call.removeClass();
         call.addClass("call terminated");
         status_text.text(description || "terminated");
-
-        break;
-
-      case "answered_elsewhere":
-        call.removeClass();
-        call.addClass("call answered-elsewhere");
-        status_text.text("answered elsewhere");
-
         break;
 
       case "incoming":
-        document.title = "*** incoming call ***";
         call.removeClass();
         call.addClass("call incoming");
         status_text.text("incoming call...");
@@ -455,7 +413,6 @@ window.GUI = {
 
         // Set background image
         $('#remoteView').attr('poster', "images/sip-on-the-web.png");
-
         break;
 
       default:
@@ -552,14 +509,16 @@ window.GUI = {
 
 
   jssipCall : function(target) {
-      var selfView, remoteView, mediaType;
+      var call, views, selfView, remoteView, useAudio, useVideo;
 
-      selfView = document.getElementById('selfView'),
-      remoteView = document.getElementById('remoteView')
-      mediaType = {audio: true, video: $('#video').is(':checked')};
+      selfView = document.getElementById('selfView');
+      remoteView = document.getElementById('remoteView');
+      views = {selfView: selfView, remoteView: remoteView};
+      useAudio = true;
+      useVideo = $('#video').is(':checked');
 
       try {
-        call =  MyPhone.call(target, selfView, remoteView, mediaType);
+        call = MyPhone.call(target, useAudio, useVideo, null, views);
       } catch(e){
         console.log(e);
         return;
@@ -567,9 +526,11 @@ window.GUI = {
   },
 
 
-  jssipMessage : function(session, uri, text) {
+  jssipMessage : function(uri, text) {
+    var messager;
+
     try {
-      var messager = MyPhone.message(uri,text);
+      messager = MyPhone.message(uri,text);
     } catch(e){
       console.log(e);
       return;
