@@ -509,7 +509,7 @@ window.GUI = {
 
 
   jssipCall : function(target) {
-      var call, views, selfView, remoteView, useAudio, useVideo;
+      var views, selfView, remoteView, useAudio, useVideo;
 
       selfView = document.getElementById('selfView');
       remoteView = document.getElementById('remoteView');
@@ -518,7 +518,7 @@ window.GUI = {
       useVideo = $('#video').is(':checked');
 
       try {
-        call = MyPhone.call(target, useAudio, useVideo, null, views);
+        MyPhone.call(target, useAudio, useVideo, null, views);
       } catch(e){
         console.log(e);
         return;
@@ -527,10 +527,8 @@ window.GUI = {
 
 
   jssipMessage : function(uri, text) {
-    var messager;
-
     try {
-      messager = MyPhone.message(uri,text);
+      MyPhone.sendMessage(uri,text);
     } catch(e){
       console.log(e);
       return;
