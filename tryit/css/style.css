@@ -724,7 +724,7 @@ body.bg05 {
 
 
 /****************** TMP *********************/
-#deregister_all {
+#unregister_all {
   position: fixed;
   top: 0;
   right: 0;

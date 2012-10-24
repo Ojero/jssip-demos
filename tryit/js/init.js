@@ -152,14 +152,14 @@ $(document).ready(function(){
       register_checkbox.attr("checked", true);
       // Avoid new change until the registration action ends.
       register_checkbox.attr("disabled", true);
-      MyPhone.deregister();
+      MyPhone.unregister();
     }
   });
 
-  // NOTE: Para hacer deregister_all (esquina arriba-dcha un cuadro
+  // NOTE: Para hacer unregister_all (esquina arriba-dcha un cuadro
   // transparente de 20 x 20 px.
-  $("#deregister_all").click(function() {
-    MyPhone.deregister('all');
+  $("#unregister_all").click(function() {
+    MyPhone.unregister('all');
   });
 
   // NOTE: Para desconectarse/conectarse al WebSocket.
