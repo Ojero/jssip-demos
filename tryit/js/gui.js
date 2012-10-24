@@ -135,7 +135,7 @@ window.GUI = {
     });
 
     call.on('progress',function(e){
-      if (e.originator === 'remote') {
+      if (e.data.originator === 'remote') {
         GUI.setCallSessionStatus(session, 'in-progress');
       }
     });
